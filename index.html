@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Snap-Like Filters with GPS</title>
+<style>
+  /* Reset styles */
+  body, html {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    font-family: Arial, sans-serif;
+  }
+
+  #camera-container {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    background: black;
+  }
+
+  /* Full-screen video */
+  #camera {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    position: absolute;
+    top: 0;
+    left: 0;
+    filter: none;
+    transition: filter 0.3s ease;
+  }
+
+  /* Header (title and logo) */
+  #header {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 15px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    z-index: 10;
+  }
+
+  #header h1 {
+    color: white;
+    margin: 0;
+    font-size: 20px;
+    text-align: center;
+  }
+
+  #header img {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    margin-top: 5px;
+  }
+
+  /* Buttons Container */
+  #controls {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    z-index: 20;
+  }
+
+  /* Filter Buttons */
+  .filter-buttons {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 20px;
+  }
+
+  .filter-button {
+    width: 50px;
+    height: 50px;
+    background-color: rgba(255, 255, 255, 0.3);
+    border: 2px solid white;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: transform 0.2s ease, background-color 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px; /* Reduced font size */
+    color: white;
+  }
+
+  .filter-button:hover {
+    transform: scale(1.2);
+    background-color: rgba(255, 255, 255, 0.5);
+  }
+
+  .filter-button.active {
+    background-color: rgba(255, 255, 255, 1);
+  }
+
+  /* Action Buttons */
+  #action-buttons {
+    display: flex;
+    gap: 15px;
+    margin-top: 15px;
+  }
+
+  .button {
+    width: 50px;
+    height: 50px;
+    background-color: rgba(255, 255, 255, 0.3);
+    border: 2px solid white;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: transform 0.2s ease, background-color 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    color: white;
+  }
+
+  .button:hover {
+    transform: scale(1.2);
+    background-color: rgba(255, 255, 255, 0.5);
+  }
+
+  .button.active {
+    background-color: rgba(255, 255, 255, 1);
+  }
+</style>
+</head>
+<body>
+  <div id="camera-container">
+    <!-- Header -->
+    <div id="header">
+      <h1>Snapchat Pro</h1>
+      <img src="https://cdn.icon-icons.com/icons2/694/PNG/512/SnapChat_Rounded_icon-icons.com_61574.png" alt="Logo">
+    </div>
+
+    <!-- Camera -->
+    <video id="camera" autoplay playsinline muted></video>
+
+    <!-- Controls -->
+    <div id="controls">
+      <!-- Filter Buttons -->
+<div class="filter-buttons">
+    <!-- أزرار الفلاتر مع اختصار الأسماء -->
+    <button class="filter-button" data-filter="grayscale">GS</button>
+    <button class="filter-button" data-filter="sepia">S</button>
+    <button class="filter-button" data-filter="invert">I</button>
+    <button class="filter-button" data-filter="blur">B</button>
+    <button class="filter-button" data-filter="none">N</button>
+</div>
+
+      <!-- Action Buttons -->
+      <div id="action-buttons">
+        <div id="capture" class="button">📸</div>
+        <div id="toggle-camera" class="button">🔄</div>
+      </div>
+    </div>
+  </div>
+
+<script>
+    const video = document.getElementById('camera');
+    const filterButtons = document.querySelectorAll('[data-filter]');
+    const captureButton = document.getElementById('capture');
+    const toggleCameraButton = document.getElementById('toggle-camera');
+
+    let currentStream = null;
+    let usingFrontCamera = true;
+
+    // Apply selected filter
+    filterButtons.forEach(button => {
+      button.addEventListener('click', () => {
+        const filter = button.dataset.filter;
+
+        // Apply the selected filter to the video
+        video.style.filter = getFilter(filter);
+
+        // Update active button
+        filterButtons.forEach(btn => btn.classList.remove('active'));
+        button.classList.add('active');
+      });
+    });
+
+    // Map filter names to CSS filter values
+    function getFilter(name) {
+      switch (name) {
+        case 'grayscale':
+          return 'grayscale(100%)';
+        case 'sepia':
+          return 'sepia(100%)';
+        case 'invert':
+          return 'invert(100%)';
+        case 'blur':
+          return 'blur(5px)';
+        default:
+          return 'none';
+      }
+    }
+
+    // Start camera
+    async function startCamera(front = true) {
+      const constraints = {
+        video: {
+          facingMode: front ? 'user' : 'environment',
+        },
+      };
+
+      if (currentStream) {
+        currentStream.getTracks().forEach(track => track.stop());
+      }
+
+      try {
+        currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+        video.srcObject = currentStream;
+
+        // Apply mirroring effect for front camera
+        if (front) {
+          video.style.transform = 'scaleX(-1)';
+        } else {
+          video.style.transform = 'scaleX(1)';
+        }
+      } catch (error) {
+        console.error('Error accessing camera:', error);
+      }
+    }
+
+    // Toggle camera
+    toggleCameraButton.addEventListener('click', () => {
+      usingFrontCamera = !usingFrontCamera;
+      startCamera(usingFrontCamera);
+    });
+
+    // Capture image
+    captureButton.addEventListener('click', () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+
+      const ctx = canvas.getContext('2d');
+      ctx.filter = video.style.filter;
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      const image = canvas.toDataURL('image/png');
+      console.log('Captured Image:', image);
+    });
+
+    // Get GPS location
+    navigator.geolocation.getCurrentPosition(
+      position => {
+        const { latitude, longitude } = position.coords;
+        console.log(`Latitude: ${latitude}, Longitude: ${longitude}`);
+      },
+      error => {
+        console.error('Error getting location:', error);
+      }
+    );
+
+    // Initialize
+    startCamera();
+</script>
+</body>
+</html>
